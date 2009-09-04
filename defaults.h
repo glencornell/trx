@@ -1,0 +1,14 @@
+#ifndef DEFAULTS_H
+#define DEFAULTS_H
+
+#define DEFAULT_DEVICE "default"
+#define DEFAULT_BUFFER 16
+
+#define DEFAULT_SERVICE "1350"
+#define DEFAULT_FRAME 96
+
+#define DEFAULT_RATE 44100
+#define DEFAULT_CHANNELS 2
+#define DEFAULT_BITRATE 128
+
+#endif
