@@ -2,168 +2,106 @@
 #include <string.h>
 #include <alsa/asoundlib.h>
 #include <celt/celt.h>
+#include <ortp/ortp.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 
 #include "defaults.h"
 #include "device.h"
-#include "jitter.h"
 #include "sched.h"
 
-#define ENCODED_BYTES 71
+static unsigned int verbose = DEFAULT_VERBOSE;
 
-/*
- * Bind to a network socket for receiving packets on the given port
- */
-
-static int listen_on_network(const char *service)
+static RtpSession* create_rtp_recv(const char *addr_desc, const int port,
+		unsigned int jitter)
 {
-	int r, sd;
-	struct addrinfo hints, *servinfo, *p;
+	RtpSession *session;
 
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_flags = AI_PASSIVE; /* use my IP */
-
-	r = getaddrinfo(NULL, service, &hints, &servinfo);
-	if (r != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(r));
-		return -1;
+	session = rtp_session_new(RTP_SESSION_RECVONLY);
+	rtp_session_set_scheduling_mode(session, 0);
+	rtp_session_set_blocking_mode(session, 0);
+	rtp_session_set_local_addr(session, addr_desc, port);
+	rtp_session_set_connected_mode(session, FALSE);
+	rtp_session_enable_adaptive_jitter_compensation(session, TRUE);
+	rtp_session_set_jitter_compensation(session, jitter); /* ms */
+	if (rtp_session_set_payload_type(session, 0) != 0)
+		abort();
+	if (rtp_session_signal_connect(session, "timestamp_jump",
+			(RtpCallback)rtp_session_resync, 0) != 0)
+	{
+		abort();
 	}
 
-	/* Bind to the first one we can */
-
-	for (p = servinfo; p != NULL; p = p->ai_next) {
-		sd = socket(p->ai_family, p->ai_socktype | SOCK_NONBLOCK,
-				p->ai_protocol);
-		if (sd == -1) {
-			perror("socket");
-			continue;
-		}
-
-		if (bind(sd, p->ai_addr, p->ai_addrlen) == -1) {
-			if (close(sd) == -1)
-				abort();
-			perror("bind");
-			continue;
-		}
-
-		break;
-	}
-
-	freeaddrinfo(servinfo);
-
-	if (p == NULL) {
-		fputs("Failed to bind socket\n", stderr);
-		return -1;
-	} else {
-		return sd;
-	}
+	return session;
 }
 
-/*
- * Playback audio from the buffer to the audio device
- */
-
-static int play_audio(struct jitbuf_t *jb, CELTDecoder *decoder,
-		      snd_pcm_t *snd)
+static int play_one_frame(void *packet,
+		size_t len,
+		CELTDecoder *decoder,
+		snd_pcm_t *snd,
+		const unsigned int channels,
+		const snd_pcm_uframes_t samples)
 {
 	int r;
-	void *data;
 	float *pcm;
 	snd_pcm_sframes_t f;
 
-	pcm = alloca(sizeof(float) * DEFAULT_FRAME * DEFAULT_CHANNELS);
+	pcm = alloca(sizeof(float) * samples * channels);
 
-	data = jitbuf_front(jb);
-	if (data == NULL) {
+	if (packet == NULL) {
 		r = celt_decode_float(decoder, NULL, 0, pcm);
 	} else {
-		r = celt_decode_float(decoder, data, ENCODED_BYTES, pcm);
+		r = celt_decode_float(decoder, packet, len, pcm);
 	}
 	if (r != 0) {
 		fputs("Error in celt_decode\n", stderr);
 		return -1;
 	}
 
-	f = snd_pcm_writei(snd, pcm, DEFAULT_FRAME);
+	f = snd_pcm_writei(snd, pcm, samples);
 	if (f < 0) {
 		aerror("snd_pcm_writei", f);
 		return -1;
 	}
-	if (f < DEFAULT_FRAME)
+	if (f < samples)
 		fprintf(stderr, "Short write %ld\n", f);
 
-	jitbuf_pop(jb);
-	free(data);
-
 	return 0;
 }
 
-/*
- * Read from the network into the buffer
- */
-
-static int read_from_network(int sd, struct jitbuf_t *jb)
+static int run_rx(RtpSession *session,
+		CELTDecoder *decoder,
+		snd_pcm_t *snd,
+		const unsigned int channels,
+		const snd_pcm_uframes_t frame)
 {
-	size_t z;
-	char buf[32768];
-	void *data;
-	seq_t seq;
-
-	z = recvfrom(sd, buf, sizeof(buf), 0, NULL, NULL);
-	if (z == -1) {
-		if (errno == EAGAIN)
-			return -EAGAIN;
-		perror("recvfrom");
-		return -1;
-	}
-	if (z != sizeof(uint32_t) + ENCODED_BYTES) {
-		fputs("small packet", stderr);
-		return -1;
-	}
-
-	/* First 32-bits is sequence number, rest is data */
-	seq = ntohl(*(uint32_t*)buf);
-	z -= sizeof(uint32_t);
-	assert(z >= 0);
-	data = malloc(z);
-	memcpy(data, buf + sizeof(uint32_t), z);
-
-	if (jitbuf_push(jb, seq, data) == -1)
-		free(data);
-
-	return 0;
-}
-
-/*
- * The main loop of receiving audio and playing it back
- */
-
-static int run_rx(int sd, CELTDecoder *decoder, snd_pcm_t *snd)
-{
-	int r;
-	struct jitbuf_t jb;
-
-	jitbuf_init(&jb);
+	int ts = 0;
 
 	for (;;) {
-		for (;;) {
-			r = read_from_network(sd, &jb);
-			if (r == -EAGAIN)
-				break;
-			if (r != 0)
-				return -1;
+		int r, have_more;
+		char buf[32768];
+		void *packet;
+
+		r = rtp_session_recv_with_ts(session, buf,
+				sizeof(buf), ts, &have_more);
+		assert(r >= 0);
+		assert(have_more == 0);
+		if (r == 0) {
+			packet = NULL;
+			if (verbose > 1)
+				fputc('#', stderr);
+		} else {
+			packet = buf;
+			if (verbose > 1)
+				fputc('.', stderr);
 		}
 
-		//jitbuf_debug(&jb, stderr);
-
-		if (play_audio(&jb, decoder, snd) == -1)
+		r = play_one_frame(packet, r, decoder, snd, channels, frame);
+		if (r == -1)
 			return -1;
-	}
 
-	jitbuf_clear(&jb);
+		ts += frame;
+	}
 }
 
 static void usage(FILE *fd)
@@ -171,32 +109,54 @@ static void usage(FILE *fd)
 	fprintf(fd, "Usage: rx [<parameters>]\n");
 
 	fprintf(fd, "\nAudio device (ALSA) parameters:\n");
-	fprintf(fd, "  -d <device>   Device name (default '%s')\n",
+	fprintf(fd, "  -d <dev>    Device name (default '%s')\n",
 		DEFAULT_DEVICE);
-	fprintf(fd, "  -m <ms>       Buffer time (milliseconds, default %d)\n",
+	fprintf(fd, "  -m <ms>     Buffer time (milliseconds, default %d)\n",
 		DEFAULT_BUFFER);
 
 	fprintf(fd, "\nNetwork parameters:\n");
-	fprintf(fd, "  -p <port>     UDP port number or name (default %s)\n",
-		DEFAULT_SERVICE);
+	fprintf(fd, "  -h <addr>   IP address to listen on (default %s)\n",
+		DEFAULT_ADDR);
+	fprintf(fd, "  -p <port>   UDP port number (default %d)\n",
+		DEFAULT_PORT);
+	fprintf(fd, "  -j <ms>     Jitter buffer (milliseconds, default %d)\n",
+		DEFAULT_JITTER);
+
+	fprintf(fd, "\nEncoding parameters (must match sender):\n");
+	fprintf(fd, "  -r <rate>   Sample rate (default %d)\n",
+		DEFAULT_RATE);
+	fprintf(fd, "  -c <n>      Number of channels (default %d)\n",
+		DEFAULT_CHANNELS);
+	fprintf(fd, "  -f <bytes>  Frame size (default %d)\n",
+		DEFAULT_FRAME);
+
+	fprintf(fd, "\nDisplay parameters:\n");
+	fprintf(fd, "  -v <n>      Verbosity level (default %d)\n",
+		DEFAULT_VERBOSE);
 }
 
 int main(int argc, char *argv[])
 {
-	int sd, r;
+	int r;
 	snd_pcm_t *snd;
 	CELTMode *mode;
 	CELTDecoder *decoder;
+	RtpSession *session;
 
 	/* command-line options */
 	const char *device = DEFAULT_DEVICE,
-		*service = DEFAULT_SERVICE;
-	unsigned int buffer = DEFAULT_BUFFER;
+		*addr = DEFAULT_ADDR;
+	unsigned int buffer = DEFAULT_BUFFER,
+		rate = DEFAULT_RATE,
+		frame = DEFAULT_FRAME,
+		jitter = DEFAULT_JITTER,
+		channels = DEFAULT_CHANNELS,
+		port = DEFAULT_PORT;
 
 	for (;;) {
 		int c;
 
-		c = getopt(argc, argv, "d:m:p:");
+		c = getopt(argc, argv, "d:h:j:m:p:v:");
 		if (c == -1)
 			break;
 
@@ -204,11 +164,20 @@ int main(int argc, char *argv[])
 		case 'd':
 			device = optarg;
 			break;
+		case 'h':
+			addr = optarg;
+			break;
+		case 'j':
+			jitter = atoi(optarg);
+			break;
 		case 'm':
 			buffer = atoi(optarg);
 			break;
 		case 'p':
-			service = optarg;
+			port = atoi(optarg);
+			break;
+		case 'v':
+			verbose = atoi(optarg);
 			break;
 		default:
 			usage(stderr);
@@ -216,8 +185,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	mode = celt_mode_create(DEFAULT_RATE, DEFAULT_CHANNELS, DEFAULT_FRAME,
-				NULL);
+	mode = celt_mode_create(rate, channels, frame, NULL);
 	if (mode == NULL) {
 		fputs("celt_mode_create failed\n", stderr);
 		return -1;
@@ -228,36 +196,35 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	sd = listen_on_network(service);
-	if (sd == -1)
+	if (go_realtime() != 0)
 		return -1;
+
+	ortp_init();
+	ortp_scheduler_init();
+	session = create_rtp_recv(addr, port, jitter);
+	assert(session != NULL);
 
 	r = snd_pcm_open(&snd, device, SND_PCM_STREAM_PLAYBACK, 0);
 	if (r < 0) {
 		aerror("snd_pcm_open", r);
 		return -1;
 	}
-	if (set_alsa_hw(snd, DEFAULT_RATE, DEFAULT_CHANNELS,
-			buffer * 1000) == -1)
-	{
+	if (set_alsa_hw(snd, rate, channels, buffer * 1000) == -1)
 		return -1;
-	}
 	if (set_alsa_sw(snd) == -1)
 		return -1;
 
-	if (go_realtime() != 0)
-		return -1;
-
-	r = run_rx(sd, decoder, snd);
+	r = run_rx(session, decoder, snd, channels, frame);
 
 	if (snd_pcm_close(snd) < 0)
 		abort();
 
+	rtp_session_destroy(session);
+	ortp_exit();
+	ortp_global_stats_display();
+
 	celt_decoder_destroy(decoder);
 	celt_mode_destroy(mode);
-
-	if (close(sd) == -1)
-		abort();
 
 	return r;
 }
