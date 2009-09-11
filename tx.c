@@ -190,6 +190,11 @@ int main(int argc, char *argv[])
 		fputs("celt_encoder_create failed\n", stderr);
 		return -1;
 	}
+	if (celt_encoder_ctl(encoder, CELT_SET_PREDICTION(2)) != CELT_OK) {
+		fputs("CELT_SET_PREDICTION failed\n", stderr);
+		return -1;
+	}
+
 	bytes_per_frame = kbps * 1024 * frame / rate / 8;
 	fprintf(stderr, "bytes_per_frame = %d\n", bytes_per_frame);
 
