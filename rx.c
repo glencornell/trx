@@ -10,7 +10,7 @@
 #include "jitter.h"
 #include "sched.h"
 
-#define ENCODED_BYTES 128
+#define ENCODED_BYTES 71
 
 /*
  * Bind to a network socket for receiving packets on the given port
@@ -157,7 +157,7 @@ static int run_rx(int sd, CELTDecoder *decoder, snd_pcm_t *snd)
 				return -1;
 		}
 
-		jitbuf_debug(&jb, stderr);
+		//jitbuf_debug(&jb, stderr);
 
 		if (play_audio(&jb, decoder, snd) == -1)
 			return -1;

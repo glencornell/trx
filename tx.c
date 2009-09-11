@@ -9,9 +9,7 @@
 #include "device.h"
 #include "sched.h"
 
-#define ENCODED_BYTES 128
-
-typedef int seq_t;
+typedef unsigned int seq_t;
 
 /*
  * Bind to network socket, for sending to the given host and port
@@ -55,7 +53,11 @@ static int bind_to_network(const char *host, const char *service,
  * Encode a frame of audio and send it over the network
  */
 
-static int send_audio(snd_pcm_t *snd, CELTEncoder *encoder,
+static int send_audio(snd_pcm_t *snd,
+		const snd_pcm_uframes_t samples,
+		const unsigned int channels,
+		CELTEncoder *encoder,
+		const size_t bytes_per_frame,
 		int sd, struct addrinfo *theirs, seq_t *seq)
 {
 	float *pcm;
@@ -63,11 +65,11 @@ static int send_audio(snd_pcm_t *snd, CELTEncoder *encoder,
 	ssize_t z;
 	snd_pcm_sframes_t f;
 
-	pcm = alloca(sizeof(float) * DEFAULT_FRAME * DEFAULT_CHANNELS);
-	packet = alloca(ENCODED_BYTES + sizeof(uint32_t));
+	pcm = alloca(sizeof(float) * samples * channels);
+	packet = alloca(bytes_per_frame + sizeof(uint32_t));
 	encoded = packet + sizeof(uint32_t);
 
-	f = snd_pcm_readi(snd, pcm, DEFAULT_FRAME);
+	f = snd_pcm_readi(snd, pcm, samples);
 	if (f < 0) {
 		aerror("snd_pcm_readi", f);
 		return -1;
@@ -75,7 +77,7 @@ static int send_audio(snd_pcm_t *snd, CELTEncoder *encoder,
 	if (f < DEFAULT_FRAME)
 		fprintf(stderr, "Short read, %ld\n", f);
 
-	z = celt_encode_float(encoder, pcm, NULL, encoded, ENCODED_BYTES);
+	z = celt_encode_float(encoder, pcm, NULL, encoded, bytes_per_frame);
 	if (z < 0) {
 		fputs("celt_encode_float failed\n", stderr);
 		return -1;
@@ -84,18 +86,22 @@ static int send_audio(snd_pcm_t *snd, CELTEncoder *encoder,
 	*(uint32_t*)packet = htonl(*seq);
 	(*seq)++;
 
-	z = sendto(sd, packet, sizeof(uint32_t) + ENCODED_BYTES, 0,
-		theirs->ai_addr, theirs->ai_addrlen);
+	z = sendto(sd, packet, sizeof(uint32_t) + bytes_per_frame, 0,
+			theirs->ai_addr, theirs->ai_addrlen);
 	if (z == -1) {
 		perror("sendto");
 		return -1;
 	}
-	fputc('>', stderr);
+	//fputc('>', stderr);
 
 	return 0;
 }
 
-static int run_tx(snd_pcm_t *snd, CELTEncoder *encoder,
+static int run_tx(snd_pcm_t *snd,
+		const snd_pcm_uframes_t samples,
+		const unsigned int channels,
+		CELTEncoder *encoder,
+		const size_t bytes_per_frame,
 		int sd, struct addrinfo *theirs)
 {
 	seq_t seq = 0;
@@ -103,7 +109,9 @@ static int run_tx(snd_pcm_t *snd, CELTEncoder *encoder,
 	for (;;) {
 		int r;
 
-		r = send_audio(snd, encoder, sd, theirs, &seq);
+		r = send_audio(snd, samples, channels,
+				encoder, bytes_per_frame,
+				sd, theirs, &seq);
 		if (r == -1)
 			return -1;
 	}
@@ -141,6 +149,7 @@ int main(int argc, char *argv[])
 	snd_pcm_t *snd;
 	CELTMode *mode;
 	CELTEncoder *encoder;
+	size_t bytes_per_frame;
 
 	/* command-line options */
 	const char *device = DEFAULT_DEVICE,
@@ -148,17 +157,21 @@ int main(int argc, char *argv[])
 		*host;
 	unsigned int buffer = DEFAULT_BUFFER,
 		rate = DEFAULT_RATE,
-		channels = DEFAULT_CHANNELS;
-	size_t frame = DEFAULT_FRAME;
-		
+		channels = DEFAULT_CHANNELS,
+		frame = DEFAULT_FRAME,
+		kbps = DEFAULT_BITRATE;
+
 	for (;;) {
 		int c;
 
-		c = getopt(argc, argv, "c:d:f:m:p:r:");
+		c = getopt(argc, argv, "b:c:d:f:m:p:r:");
 		if (c == -1)
 			break;
 
 		switch (c) {
+		case 'b':
+			kbps = atoi(optarg);
+			break;
 		case 'c':
 			channels = atoi(optarg);
 			break;
@@ -200,6 +213,8 @@ int main(int argc, char *argv[])
 		fputs("celt_encoder_create failed\n", stderr);
 		return -1;
 	}
+	bytes_per_frame = kbps * 1024 * frame / rate / 8;
+	fprintf(stderr, "bytes_per_frame = %d\n", bytes_per_frame);
 
 	sd = bind_to_network(host, service, &servinfo, &theirs);
 	if (sd == -1)
@@ -218,7 +233,7 @@ int main(int argc, char *argv[])
 	if (go_realtime() != 0)
 		return -1;
 
-	r = run_tx(snd, encoder, sd, theirs);
+	r = run_tx(snd, frame, channels, encoder, bytes_per_frame, sd, theirs);
 
 	freeaddrinfo(servinfo);
 
