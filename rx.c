@@ -8,6 +8,7 @@
 
 #include "defaults.h"
 #include "device.h"
+#include "notice.h"
 #include "sched.h"
 
 static unsigned int verbose = DEFAULT_VERBOSE;
@@ -153,16 +154,21 @@ int main(int argc, char *argv[])
 		channels = DEFAULT_CHANNELS,
 		port = DEFAULT_PORT;
 
+	fputs("rx " COPYRIGHT "\n", stderr);
+
 	for (;;) {
 		int c;
 
-		c = getopt(argc, argv, "d:h:j:m:p:v:");
+		c = getopt(argc, argv, "d:f:h:j:m:p:v:");
 		if (c == -1)
 			break;
 
 		switch (c) {
 		case 'd':
 			device = optarg;
+			break;
+		case 'f':
+			frame = atoi(optarg);
 			break;
 		case 'h':
 			addr = optarg;

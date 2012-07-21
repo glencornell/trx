@@ -8,6 +8,7 @@
 
 #include "defaults.h"
 #include "device.h"
+#include "notice.h"
 #include "sched.h"
 
 static unsigned int verbose = DEFAULT_VERBOSE;
@@ -139,6 +140,8 @@ int main(int argc, char *argv[])
 		kbps = DEFAULT_BITRATE,
 		port = DEFAULT_PORT;
 
+	fputs("tx " COPYRIGHT "\n", stderr);
+
 	for (;;) {
 		int c;
 
@@ -194,9 +197,7 @@ int main(int argc, char *argv[])
 		fputs("CELT_SET_PREDICTION failed\n", stderr);
 		return -1;
 	}
-
 	bytes_per_frame = kbps * 1024 * frame / rate / 8;
-	fprintf(stderr, "bytes_per_frame = %d\n", bytes_per_frame);
 
 	if (go_realtime() != 0)
 		return -1;
