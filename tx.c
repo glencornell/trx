@@ -1,7 +1,7 @@
 #include <netdb.h>
 #include <string.h>
 #include <alsa/asoundlib.h>
-#include <celt/celt.h>
+#include <opus/opus.h>
 #include <ortp/ortp.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -36,7 +36,7 @@ static RtpSession* create_rtp_send(const char *addr_desc, const int port)
 static int send_one_frame(snd_pcm_t *snd,
 		const unsigned int channels,
 		const snd_pcm_uframes_t samples,
-		CELTEncoder *encoder,
+		OpusEncoder *encoder,
 		const size_t bytes_per_frame,
 		RtpSession *session)
 {
@@ -57,9 +57,9 @@ static int send_one_frame(snd_pcm_t *snd,
 	if (f < samples)
 		fprintf(stderr, "Short read, %ld\n", f);
 
-	z = celt_encode_float(encoder, pcm, NULL, packet, bytes_per_frame);
+	z = opus_encode_float(encoder, pcm, samples, packet, bytes_per_frame);
 	if (z < 0) {
-		fputs("celt_encode_float failed\n", stderr);
+		fprintf(stderr, "opus_encode_float: %s\n", opus_strerror(z));
 		return -1;
 	}
 
@@ -72,7 +72,7 @@ static int send_one_frame(snd_pcm_t *snd,
 static int run_tx(snd_pcm_t *snd,
 		const unsigned int channels,
 		const snd_pcm_uframes_t frame,
-		CELTEncoder *encoder,
+		OpusEncoder *encoder,
 		const size_t bytes_per_frame,
 		RtpSession *session)
 {
@@ -123,11 +123,10 @@ static void usage(FILE *fd)
 
 int main(int argc, char *argv[])
 {
-	int r;
+	int r, error;
 	size_t bytes_per_frame;
 	snd_pcm_t *snd;
-	CELTMode *mode;
-	CELTEncoder *encoder;
+	OpusEncoder *encoder;
 	RtpSession *session;
 
 	/* command-line options */
@@ -183,20 +182,14 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	mode = celt_mode_create(rate, channels, frame, NULL);
-	if (mode == NULL) {
-		fputs("celt_mode_create failed\n", stderr);
-		return -1;
-	}
-	encoder = celt_encoder_create(mode);
+	encoder = opus_encoder_create(rate, channels, OPUS_APPLICATION_AUDIO,
+				&error);
 	if (encoder == NULL) {
-		fputs("celt_encoder_create failed\n", stderr);
+		fprintf(stderr, "opus_encoder_create: %s\n",
+			opus_strerror(error));
 		return -1;
 	}
-	if (celt_encoder_ctl(encoder, CELT_SET_PREDICTION(2)) != CELT_OK) {
-		fputs("CELT_SET_PREDICTION failed\n", stderr);
-		return -1;
-	}
+
 	bytes_per_frame = kbps * 1024 * frame / rate / 8;
 
 	if (go_realtime() != 0)
@@ -227,8 +220,7 @@ int main(int argc, char *argv[])
 	ortp_exit();
 	ortp_global_stats_display();
 
-	celt_encoder_destroy(encoder);
-	celt_mode_destroy(mode);
+	opus_encoder_destroy(encoder);
 
 	return r;
 }

@@ -1,7 +1,7 @@
 #include <netdb.h>
 #include <string.h>
 #include <alsa/asoundlib.h>
-#include <celt/celt.h>
+#include <opus/opus.h>
 #include <ortp/ortp.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -38,7 +38,7 @@ static RtpSession* create_rtp_recv(const char *addr_desc, const int port,
 
 static int play_one_frame(void *packet,
 		size_t len,
-		CELTDecoder *decoder,
+		OpusDecoder *decoder,
 		snd_pcm_t *snd,
 		const unsigned int channels,
 		const snd_pcm_uframes_t samples)
@@ -50,28 +50,28 @@ static int play_one_frame(void *packet,
 	pcm = alloca(sizeof(float) * samples * channels);
 
 	if (packet == NULL) {
-		r = celt_decode_float(decoder, NULL, 0, pcm);
+		r = opus_decode_float(decoder, NULL, 0, pcm, samples, 1);
 	} else {
-		r = celt_decode_float(decoder, packet, len, pcm);
+		r = opus_decode_float(decoder, packet, len, pcm, samples, 0);
 	}
-	if (r != 0) {
-		fputs("Error in celt_decode\n", stderr);
+	if (r < 0) {
+		fprintf(stderr, "opus_decode: %s\n", opus_strerror(r));
 		return -1;
 	}
 
-	f = snd_pcm_writei(snd, pcm, samples);
+	f = snd_pcm_writei(snd, pcm, r);
 	if (f < 0) {
 		aerror("snd_pcm_writei", f);
 		return -1;
 	}
-	if (f < samples)
+	if (f < r)
 		fprintf(stderr, "Short write %ld\n", f);
 
-	return 0;
+	return r;
 }
 
 static int run_rx(RtpSession *session,
-		CELTDecoder *decoder,
+		OpusDecoder *decoder,
 		snd_pcm_t *snd,
 		const unsigned int channels,
 		const snd_pcm_uframes_t frame)
@@ -101,7 +101,7 @@ static int run_rx(RtpSession *session,
 		if (r == -1)
 			return -1;
 
-		ts += frame;
+		ts += r;
 	}
 }
 
@@ -138,10 +138,9 @@ static void usage(FILE *fd)
 
 int main(int argc, char *argv[])
 {
-	int r;
+	int r, error;
 	snd_pcm_t *snd;
-	CELTMode *mode;
-	CELTDecoder *decoder;
+	OpusDecoder *decoder;
 	RtpSession *session;
 
 	/* command-line options */
@@ -191,14 +190,10 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	mode = celt_mode_create(rate, channels, frame, NULL);
-	if (mode == NULL) {
-		fputs("celt_mode_create failed\n", stderr);
-		return -1;
-	}
-	decoder = celt_decoder_create(mode);
+	decoder = opus_decoder_create(rate, channels, &error);
 	if (decoder == NULL) {
-		fputs("celt_decoder_create failed\n", stderr);
+		fprintf(stderr, "opus_decoder_create: %s\n",
+			opus_strerror(error));
 		return -1;
 	}
 
@@ -229,8 +224,7 @@ int main(int argc, char *argv[])
 	ortp_exit();
 	ortp_global_stats_display();
 
-	celt_decoder_destroy(decoder);
-	celt_mode_destroy(mode);
+	opus_decoder_destroy(decoder);
 
 	return r;
 }
