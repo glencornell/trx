@@ -83,7 +83,7 @@ static int run_rx(RtpSession *session,
 		char buf[32768];
 		void *packet;
 
-		r = rtp_session_recv_with_ts(session, buf,
+		r = rtp_session_recv_with_ts(session, (uint8_t*)buf,
 				sizeof(buf), ts, &have_more);
 		assert(r >= 0);
 		assert(have_more == 0);
