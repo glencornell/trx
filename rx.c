@@ -153,11 +153,14 @@ int main(int argc, char *argv[])
 	for (;;) {
 		int c;
 
-		c = getopt(argc, argv, "d:h:j:m:p:v:");
+		c = getopt(argc, argv, "c:d:h:j:m:p:v:");
 		if (c == -1)
 			break;
 
 		switch (c) {
+		case 'c':
+			channels = atoi(optarg);
+			break;
 		case 'd':
 			device = optarg;
 			break;
