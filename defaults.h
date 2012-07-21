@@ -4,7 +4,7 @@
 #define DEFAULT_DEVICE "default"
 #define DEFAULT_BUFFER 16
 
-#define DEFAULT_ADDR "0.0.0.0"
+#define DEFAULT_ADDR "::"
 #define DEFAULT_PORT 1350
 #define DEFAULT_FRAME 960
 #define DEFAULT_JITTER 16
