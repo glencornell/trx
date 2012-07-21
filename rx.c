@@ -40,12 +40,11 @@ static int play_one_frame(void *packet,
 		size_t len,
 		OpusDecoder *decoder,
 		snd_pcm_t *snd,
-		const unsigned int channels,
-		const snd_pcm_uframes_t samples)
+		const unsigned int channels)
 {
 	int r;
 	float *pcm;
-	snd_pcm_sframes_t f;
+	snd_pcm_sframes_t f, samples = 1920;
 
 	pcm = alloca(sizeof(float) * samples * channels);
 
@@ -73,8 +72,7 @@ static int play_one_frame(void *packet,
 static int run_rx(RtpSession *session,
 		OpusDecoder *decoder,
 		snd_pcm_t *snd,
-		const unsigned int channels,
-		const snd_pcm_uframes_t frame)
+		const unsigned int channels)
 {
 	int ts = 0;
 
@@ -97,7 +95,7 @@ static int run_rx(RtpSession *session,
 				fputc('.', stderr);
 		}
 
-		r = play_one_frame(packet, r, decoder, snd, channels, frame);
+		r = play_one_frame(packet, r, decoder, snd, channels);
 		if (r == -1)
 			return -1;
 
@@ -128,8 +126,6 @@ static void usage(FILE *fd)
 		DEFAULT_RATE);
 	fprintf(fd, "  -c <n>      Number of channels (default %d)\n",
 		DEFAULT_CHANNELS);
-	fprintf(fd, "  -f <bytes>  Frame size (default %d)\n",
-		DEFAULT_FRAME);
 
 	fprintf(fd, "\nDisplay parameters:\n");
 	fprintf(fd, "  -v <n>      Verbosity level (default %d)\n",
@@ -148,7 +144,6 @@ int main(int argc, char *argv[])
 		*addr = DEFAULT_ADDR;
 	unsigned int buffer = DEFAULT_BUFFER,
 		rate = DEFAULT_RATE,
-		frame = DEFAULT_FRAME,
 		jitter = DEFAULT_JITTER,
 		channels = DEFAULT_CHANNELS,
 		port = DEFAULT_PORT;
@@ -158,16 +153,13 @@ int main(int argc, char *argv[])
 	for (;;) {
 		int c;
 
-		c = getopt(argc, argv, "d:f:h:j:m:p:v:");
+		c = getopt(argc, argv, "d:h:j:m:p:v:");
 		if (c == -1)
 			break;
 
 		switch (c) {
 		case 'd':
 			device = optarg;
-			break;
-		case 'f':
-			frame = atoi(optarg);
 			break;
 		case 'h':
 			addr = optarg;
@@ -215,7 +207,7 @@ int main(int argc, char *argv[])
 	if (set_alsa_sw(snd) == -1)
 		return -1;
 
-	r = run_rx(session, decoder, snd, channels, frame);
+	r = run_rx(session, decoder, snd, channels);
 
 	if (snd_pcm_close(snd) < 0)
 		abort();
