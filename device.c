@@ -44,8 +44,8 @@ int set_alsa_hw(snd_pcm_t *pcm,
 	CHK("snd_pcm_hw_params_set_channels", r);
 
 	dir = 0;
-	r = snd_pcm_hw_params_set_buffer_time_near(pcm, hw, &buffer, &dir);
-	CHK("snd_pcm_hw_params_set_buffer_time_near", r);
+	r = snd_pcm_hw_params_set_buffer_time_max(pcm, hw, &buffer, &dir);
+	CHK("snd_pcm_hw_params_set_buffer_time_max", r);
 
 	r = snd_pcm_hw_params(pcm, hw);
 	CHK("hw_params", r);
