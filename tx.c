@@ -192,9 +192,6 @@ int main(int argc, char *argv[])
 
 	bytes_per_frame = kbps * 1024 * frame / rate / 8;
 
-	if (go_realtime() != 0)
-		return -1;
-
 	ortp_init();
 	ortp_scheduler_init();
 	ortp_set_log_level_mask(ORTP_MESSAGE|ORTP_WARNING|ORTP_ERROR);
@@ -211,6 +208,7 @@ int main(int argc, char *argv[])
 	if (set_alsa_sw(snd) == -1)
 		return -1;
 
+	go_realtime();
 	r = run_tx(snd, channels, frame, encoder, bytes_per_frame, session);
 
 	if (snd_pcm_close(snd) < 0)

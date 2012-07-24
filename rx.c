@@ -192,9 +192,6 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	if (go_realtime() != 0)
-		return -1;
-
 	ortp_init();
 	ortp_scheduler_init();
 	session = create_rtp_recv(addr, port, jitter);
@@ -210,6 +207,7 @@ int main(int argc, char *argv[])
 	if (set_alsa_sw(snd) == -1)
 		return -1;
 
+	go_realtime();
 	r = run_rx(session, decoder, snd, channels);
 
 	if (snd_pcm_close(snd) < 0)
