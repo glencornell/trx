@@ -17,9 +17,6 @@ rx:		rx.o device.o sched.o
 tx:		tx.o device.o sched.o
 
 clean:
-		rm -f *.o
-		rm -f *.d
-		rm -f tx
-		rm -f rx
+		rm -f *.o *.d tx rx
 
 -include *.d
