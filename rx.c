@@ -105,12 +105,13 @@ static int run_rx(RtpSession *session,
 
 static void usage(FILE *fd)
 {
-	fprintf(fd, "Usage: rx [<parameters>]\n");
+	fprintf(fd, "Usage: rx [<parameters>]\n"
+		"Real-time audio receiver over IP\n");
 
 	fprintf(fd, "\nAudio device (ALSA) parameters:\n");
 	fprintf(fd, "  -d <dev>    Device name (default '%s')\n",
 		DEFAULT_DEVICE);
-	fprintf(fd, "  -m <ms>     Buffer time (milliseconds, default %d)\n",
+	fprintf(fd, "  -m <ms>     Buffer time (default %d milliseconds)\n",
 		DEFAULT_BUFFER);
 
 	fprintf(fd, "\nNetwork parameters:\n");
@@ -118,11 +119,11 @@ static void usage(FILE *fd)
 		DEFAULT_ADDR);
 	fprintf(fd, "  -p <port>   UDP port number (default %d)\n",
 		DEFAULT_PORT);
-	fprintf(fd, "  -j <ms>     Jitter buffer (milliseconds, default %d)\n",
+	fprintf(fd, "  -j <ms>     Jitter buffer (default %d milliseconds)\n",
 		DEFAULT_JITTER);
 
 	fprintf(fd, "\nEncoding parameters (must match sender):\n");
-	fprintf(fd, "  -r <rate>   Sample rate (default %d)\n",
+	fprintf(fd, "  -r <rate>   Sample rate (default %dHz)\n",
 		DEFAULT_RATE);
 	fprintf(fd, "  -c <n>      Number of channels (default %d)\n",
 		DEFAULT_CHANNELS);
@@ -148,7 +149,7 @@ int main(int argc, char *argv[])
 		channels = DEFAULT_CHANNELS,
 		port = DEFAULT_PORT;
 
-	fputs("rx " COPYRIGHT "\n", stderr);
+	fputs(COPYRIGHT "\n", stderr);
 
 	for (;;) {
 		int c;
@@ -156,7 +157,6 @@ int main(int argc, char *argv[])
 		c = getopt(argc, argv, "c:d:h:j:m:p:v:");
 		if (c == -1)
 			break;
-
 		switch (c) {
 		case 'c':
 			channels = atoi(optarg);

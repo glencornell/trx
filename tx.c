@@ -92,12 +92,13 @@ static int run_tx(snd_pcm_t *snd,
 
 static void usage(FILE *fd)
 {
-	fprintf(fd, "Usage: tx [<parameters>]\n");
+	fprintf(fd, "Usage: tx [<parameters>]\n"
+		"Real-time audio transmitter over IP\n");
 
 	fprintf(fd, "\nAudio device (ALSA) parameters:\n");
 	fprintf(fd, "  -d <dev>    Device name (default '%s')\n",
 		DEFAULT_DEVICE);
-	fprintf(fd, "  -m <ms>     Buffer time (milliseconds, default %d)\n",
+	fprintf(fd, "  -m <ms>     Buffer time (default %d milliseconds)\n",
 		DEFAULT_BUFFER);
 
 	fprintf(fd, "\nNetwork parameters:\n");
@@ -107,11 +108,11 @@ static void usage(FILE *fd)
 		DEFAULT_PORT);
 
 	fprintf(fd, "\nEncoding parameters:\n");
-	fprintf(fd, "  -r <rate>   Sample rate (default %d)\n",
+	fprintf(fd, "  -r <rate>   Sample rate (default %dHz)\n",
 		DEFAULT_RATE);
 	fprintf(fd, "  -c <n>      Number of channels (default %d)\n",
 		DEFAULT_CHANNELS);
-	fprintf(fd, "  -f <bytes>  Frame size (default %d)\n",
+	fprintf(fd, "  -f <n>      Frame size (default %d samples, see below)\n",
 		DEFAULT_FRAME);
 	fprintf(fd, "  -b <kbps>   Bitrate (approx., default %d)\n",
 		DEFAULT_BITRATE);
@@ -119,6 +120,9 @@ static void usage(FILE *fd)
 	fprintf(fd, "\nDisplay parameters:\n");
 	fprintf(fd, "  -v <n>      Verbosity level (default %d)\n",
 		DEFAULT_VERBOSE);
+
+	fprintf(fd, "\nAllowed frame sizes (-f) are defined by the Opus codec. For example,\n"
+		"at 48000Hz the permitted values are 120, 240, 480 or 960.\n");
 }
 
 int main(int argc, char *argv[])
@@ -139,7 +143,7 @@ int main(int argc, char *argv[])
 		kbps = DEFAULT_BITRATE,
 		port = DEFAULT_PORT;
 
-	fputs("tx " COPYRIGHT "\n", stderr);
+	fputs(COPYRIGHT "\n", stderr);
 
 	for (;;) {
 		int c;
