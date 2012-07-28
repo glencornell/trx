@@ -91,7 +91,8 @@ static int play_one_frame(void *packet,
 static int run_rx(RtpSession *session,
 		OpusDecoder *decoder,
 		snd_pcm_t *snd,
-		const unsigned int channels)
+		const unsigned int channels,
+		const unsigned int rate)
 {
 	int ts = 0;
 
@@ -118,7 +119,10 @@ static int run_rx(RtpSession *session,
 		if (r == -1)
 			return -1;
 
-		ts += r;
+		/* Follow the RFC, 48kHz is reference rate for
+		 * timestamps */
+
+		ts += r * 48000 / rate;
 	}
 }
 
@@ -227,7 +231,7 @@ int main(int argc, char *argv[])
 		return -1;
 
 	go_realtime();
-	r = run_rx(session, decoder, snd, channels);
+	r = run_rx(session, decoder, snd, channels, rate);
 
 	if (snd_pcm_close(snd) < 0)
 		abort();

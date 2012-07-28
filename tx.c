@@ -57,13 +57,14 @@ static int send_one_frame(snd_pcm_t *snd,
 		const snd_pcm_uframes_t samples,
 		OpusEncoder *encoder,
 		const size_t bytes_per_frame,
+		const unsigned int ts_per_frame,
 		RtpSession *session)
 {
 	float *pcm;
 	void *packet;
 	ssize_t z;
 	snd_pcm_sframes_t f;
-	static int ts = 0;
+	static unsigned int ts = 0;
 
 	pcm = alloca(sizeof(float) * samples * channels);
 	packet = alloca(bytes_per_frame);
@@ -83,7 +84,7 @@ static int send_one_frame(snd_pcm_t *snd,
 	}
 
 	rtp_session_send_with_ts(session, packet, z, ts);
-	ts += samples;
+	ts += ts_per_frame;
 
 	return 0;
 }
@@ -93,13 +94,14 @@ static int run_tx(snd_pcm_t *snd,
 		const snd_pcm_uframes_t frame,
 		OpusEncoder *encoder,
 		const size_t bytes_per_frame,
+		const unsigned int ts_per_frame,
 		RtpSession *session)
 {
 	for (;;) {
 		int r;
 
 		r = send_one_frame(snd, channels, frame,
-				encoder, bytes_per_frame,
+				encoder, bytes_per_frame, ts_per_frame,
 				session);
 		if (r == -1)
 			return -1;
@@ -148,6 +150,7 @@ int main(int argc, char *argv[])
 {
 	int r, error;
 	size_t bytes_per_frame;
+	unsigned int ts_per_frame;
 	snd_pcm_t *snd;
 	OpusEncoder *encoder;
 	RtpSession *session;
@@ -215,6 +218,11 @@ int main(int argc, char *argv[])
 
 	bytes_per_frame = kbps * 1024 * frame / rate / 8;
 
+	/* Follow the RFC, 48kHz is reference rate for
+	 * timestamps */
+
+	ts_per_frame = frame * 48000 / rate;
+
 	ortp_init();
 	ortp_scheduler_init();
 	ortp_set_log_level_mask(ORTP_MESSAGE|ORTP_WARNING|ORTP_ERROR);
@@ -232,7 +240,8 @@ int main(int argc, char *argv[])
 		return -1;
 
 	go_realtime();
-	r = run_tx(snd, channels, frame, encoder, bytes_per_frame, session);
+	r = run_tx(snd, channels, frame, encoder, bytes_per_frame,
+		ts_per_frame, session);
 
 	if (snd_pcm_close(snd) < 0)
 		abort();
