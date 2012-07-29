@@ -177,7 +177,7 @@ int main(int argc, char *argv[])
 	for (;;) {
 		int c;
 
-		c = getopt(argc, argv, "c:d:h:j:m:p:v:");
+		c = getopt(argc, argv, "c:d:h:j:m:p:r:v:");
 		if (c == -1)
 			break;
 		switch (c) {
@@ -198,6 +198,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'p':
 			port = atoi(optarg);
+			break;
+		case 'r':
+			rate = atoi(optarg);
 			break;
 		case 'v':
 			verbose = atoi(optarg);
