@@ -15,7 +15,7 @@ LDLIBS_ORTP ?= -lortp
 
 LDLIBS += $(LDLIBS_ASOUND) $(LDLIBS_OPUS) $(LDLIBS_ORTP)
 
-.PHONY:		all install clean
+.PHONY:		all install dist clean
 
 all:		rx tx
 
@@ -26,6 +26,12 @@ tx:		tx.o device.o sched.o
 install:	rx tx
 		$(INSTALL) -d $(DESTDIR)$(BINDIR)
 		$(INSTALL) rx tx $(DESTDIR)$(BINDIR)
+
+dist:
+		mkdir -p dist
+		V=$$(git describe) && \
+		git archive --prefix="trx-$$V/" HEAD | \
+			gzip > "dist/trx-$$V.tar.gz"
 
 clean:
 		rm -f *.o *.d tx rx
