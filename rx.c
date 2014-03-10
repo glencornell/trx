@@ -127,10 +127,9 @@ static int run_rx(RtpSession *session,
 		if (r == -1)
 			return -1;
 
-		/* Follow the RFC, 48kHz is reference rate for
-		 * timestamps */
+		/* Follow the RFC, payload 0 has 8kHz reference rate */
 
-		ts += r * 48000 / rate;
+		ts += r * 8000 / rate;
 	}
 }
 

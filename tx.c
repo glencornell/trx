@@ -218,10 +218,9 @@ int main(int argc, char *argv[])
 
 	bytes_per_frame = kbps * 1024 * frame / rate / 8;
 
-	/* Follow the RFC, 48kHz is reference rate for
-	 * timestamps */
+	/* Follow the RFC, payload 0 has 8kHz reference rate */
 
-	ts_per_frame = frame * 48000 / rate;
+	ts_per_frame = frame * 8000 / rate;
 
 	ortp_init();
 	ortp_scheduler_init();
