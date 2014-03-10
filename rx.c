@@ -32,6 +32,13 @@
 
 static unsigned int verbose = DEFAULT_VERBOSE;
 
+static void timestamp_jump(RtpSession *session, ...)
+{
+	if (verbose > 1)
+		fputc('|', stderr);
+	rtp_session_resync(session);
+}
+
 static RtpSession* create_rtp_recv(const char *addr_desc, const int port,
 		unsigned int jitter)
 {
@@ -47,7 +54,7 @@ static RtpSession* create_rtp_recv(const char *addr_desc, const int port,
 	if (rtp_session_set_payload_type(session, 0) != 0)
 		abort();
 	if (rtp_session_signal_connect(session, "timestamp_jump",
-			(RtpCallback)rtp_session_resync, 0) != 0)
+					timestamp_jump, 0) != 0)
 	{
 		abort();
 	}
