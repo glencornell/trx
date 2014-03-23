@@ -71,11 +71,22 @@ static int send_one_frame(snd_pcm_t *snd,
 
 	f = snd_pcm_readi(snd, pcm, samples);
 	if (f < 0) {
-		aerror("snd_pcm_readi", f);
-		return -1;
+		f = snd_pcm_recover(snd, f, 0);
+		if (f < 0) {
+			aerror("snd_pcm_readi", f);
+			return -1;
+		}
+		return 0;
 	}
-	if (f < samples)
+
+	/* Opus encoder requires a complete frame, so if we xrun
+	 * mid-frame then we discard the incomplete audio. The next
+	 * read will catch the error condition and recover */
+
+	if (f < samples) {
 		fprintf(stderr, "Short read, %ld\n", f);
+		return 0;
+	}
 
 	z = opus_encode_float(encoder, pcm, samples, packet, bytes_per_frame);
 	if (z < 0) {

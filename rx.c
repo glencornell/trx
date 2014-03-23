@@ -87,8 +87,12 @@ static int play_one_frame(void *packet,
 
 	f = snd_pcm_writei(snd, pcm, r);
 	if (f < 0) {
-		aerror("snd_pcm_writei", f);
-		return -1;
+		f = snd_pcm_recover(snd, f, 0);
+		if (f < 0) {
+			aerror("snd_pcm_writei", f);
+			return -1;
+		}
+		return 0;
 	}
 	if (f < r)
 		fprintf(stderr, "Short write %ld\n", f);
