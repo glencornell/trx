@@ -71,6 +71,9 @@ static int send_one_frame(snd_pcm_t *snd,
 
 	f = snd_pcm_readi(snd, pcm, samples);
 	if (f < 0) {
+		if (f == -ESTRPIPE)
+			ts = 0;
+
 		f = snd_pcm_recover(snd, f, 0);
 		if (f < 0) {
 			aerror("snd_pcm_readi", f);
