@@ -70,15 +70,15 @@ static int play_one_frame(void *packet,
 		const unsigned int channels)
 {
 	int r;
-	float *pcm;
+	int16_t *pcm;
 	snd_pcm_sframes_t f, samples = 1920;
 
-	pcm = alloca(sizeof(float) * samples * channels);
+	pcm = alloca(sizeof(*pcm) * samples * channels);
 
 	if (packet == NULL) {
-		r = opus_decode_float(decoder, NULL, 0, pcm, samples, 1);
+		r = opus_decode(decoder, NULL, 0, pcm, samples, 1);
 	} else {
-		r = opus_decode_float(decoder, packet, len, pcm, samples, 0);
+		r = opus_decode(decoder, packet, len, pcm, samples, 0);
 	}
 	if (r < 0) {
 		fprintf(stderr, "opus_decode: %s\n", opus_strerror(r));

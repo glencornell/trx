@@ -53,7 +53,7 @@ int set_alsa_hw(snd_pcm_t *pcm,
 	r = snd_pcm_hw_params_set_access(pcm, hw, SND_PCM_ACCESS_RW_INTERLEAVED);
 	CHK("snd_pcm_hw_params_set_access", r);
 
-	r = snd_pcm_hw_params_set_format(pcm, hw, SND_PCM_FORMAT_FLOAT);
+	r = snd_pcm_hw_params_set_format(pcm, hw, SND_PCM_FORMAT_S16);
 	CHK("snd_pcm_hw_params_set_format", r);
 
 	r = snd_pcm_hw_params_set_rate(pcm, hw, rate, 0);
