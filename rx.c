@@ -162,9 +162,10 @@ static void usage(FILE *fd)
 	fprintf(fd, "  -c <n>      Number of channels (default %d)\n",
 		DEFAULT_CHANNELS);
 
-	fprintf(fd, "\nDisplay parameters:\n");
+	fprintf(fd, "\nProgram parameters:\n");
 	fprintf(fd, "  -v <n>      Verbosity level (default %d)\n",
 		DEFAULT_VERBOSE);
+	fprintf(fd, "  -D <file>   Run as a daemon, writing process ID to the given file\n");
 }
 
 int main(int argc, char *argv[])
@@ -176,7 +177,8 @@ int main(int argc, char *argv[])
 
 	/* command-line options */
 	const char *device = DEFAULT_DEVICE,
-		*addr = DEFAULT_ADDR;
+		*addr = DEFAULT_ADDR,
+		*pid = NULL;
 	unsigned int buffer = DEFAULT_BUFFER,
 		rate = DEFAULT_RATE,
 		jitter = DEFAULT_JITTER,
@@ -216,6 +218,9 @@ int main(int argc, char *argv[])
 		case 'v':
 			verbose = atoi(optarg);
 			break;
+		case 'D':
+			pid = optarg;
+			break;
 		default:
 			usage(stderr);
 			return -1;
@@ -243,6 +248,9 @@ int main(int argc, char *argv[])
 		return -1;
 	if (set_alsa_sw(snd) == -1)
 		return -1;
+
+	if (pid)
+		go_daemon(pid);
 
 	go_realtime();
 	r = run_rx(session, decoder, snd, channels, rate);

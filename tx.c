@@ -149,9 +149,10 @@ static void usage(FILE *fd)
 	fprintf(fd, "  -b <kbps>   Bitrate (approx., default %d)\n",
 		DEFAULT_BITRATE);
 
-	fprintf(fd, "\nDisplay parameters:\n");
+	fprintf(fd, "\nProgram parameters:\n");
 	fprintf(fd, "  -v <n>      Verbosity level (default %d)\n",
 		DEFAULT_VERBOSE);
+	fprintf(fd, "  -D <file>   Run as a daemon, writing process ID to the given file\n");
 
 	fprintf(fd, "\nAllowed frame sizes (-f) are defined by the Opus codec. For example,\n"
 		"at 48000Hz the permitted values are 120, 240, 480 or 960.\n");
@@ -168,7 +169,8 @@ int main(int argc, char *argv[])
 
 	/* command-line options */
 	const char *device = DEFAULT_DEVICE,
-		*addr = DEFAULT_ADDR;
+		*addr = DEFAULT_ADDR,
+		*pid = NULL;
 	unsigned int buffer = DEFAULT_BUFFER,
 		rate = DEFAULT_RATE,
 		channels = DEFAULT_CHANNELS,
@@ -181,7 +183,7 @@ int main(int argc, char *argv[])
 	for (;;) {
 		int c;
 
-		c = getopt(argc, argv, "b:c:d:f:h:m:p:r:v:");
+		c = getopt(argc, argv, "b:c:d:f:h:m:p:r:v:D:");
 		if (c == -1)
 			break;
 
@@ -212,6 +214,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'v':
 			verbose = atoi(optarg);
+			break;
+		case 'D':
+			pid = optarg;
 			break;
 		default:
 			usage(stderr);
@@ -248,6 +253,9 @@ int main(int argc, char *argv[])
 		return -1;
 	if (set_alsa_sw(snd) == -1)
 		return -1;
+
+	if (pid)
+		go_daemon(pid);
 
 	go_realtime();
 	r = run_tx(snd, channels, frame, encoder, bytes_per_frame,

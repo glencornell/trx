@@ -19,6 +19,7 @@
 
 #include <sched.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include "sched.h"
 
@@ -44,6 +45,34 @@ int go_realtime(void)
 
 	if (sched_setscheduler(0, SCHED_FIFO, &sp)) {
 		perror("sched_setscheduler");
+		return -1;
+	}
+
+	return 0;
+}
+
+int go_daemon(const char *pid_file)
+{
+	FILE *f;
+
+	if (daemon(0, 0) == -1) {
+		perror("daemon");
+		return -1;
+	}
+
+	if (!pid_file)
+		return 0;
+
+	f = fopen(pid_file, "w");
+	if (!f) {
+		perror("fopen");
+		return -1;
+	}
+
+	fprintf(f, "%d", getpid());
+
+	if (fclose(f) != 0) {
+		perror("fclose");
 		return -1;
 	}
 
