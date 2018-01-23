@@ -48,6 +48,8 @@ static RtpSession* create_rtp_send(const char *addr_desc, const int port)
 		abort();
 	if (rtp_session_set_multicast_ttl(session, 16) != 0)
 		abort();
+	if (rtp_session_set_dscp(session, 40) != 0)
+		abort();
 
 	return session;
 }
