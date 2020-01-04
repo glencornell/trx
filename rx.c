@@ -60,6 +60,15 @@ static RtpSession* create_rtp_recv(const char *addr_desc, const int port,
 		abort();
 	}
 
+	/*
+	 * oRTP in RECVONLY mode attempts to send RTCP packets and
+	 * segfaults (v4.3.0 tested)
+	 *
+	 * https://stackoverflow.com/questions/43591690/receiving-rtcp-issues-within-ortp-library
+	 */
+
+	rtp_session_enable_rtcp(session, FALSE);
+
 	return session;
 }
 
