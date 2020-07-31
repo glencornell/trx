@@ -55,7 +55,7 @@ static RtpSession* create_rtp_recv(const char *addr_desc, const int port,
 	if (rtp_session_set_payload_type(session, 0) != 0)
 		abort();
 	if (rtp_session_signal_connect(session, "timestamp_jump",
-					timestamp_jump, 0) != 0)
+                                       (RtpCallback)timestamp_jump, 0) != 0)
 	{
 		abort();
 	}
