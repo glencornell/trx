@@ -16,6 +16,8 @@ AC_PROG_INSTALL
 PKG_CHECK_MODULES([ALSA], [alsa])
 PKG_CHECK_MODULES([OPUS], [opus])
 PKG_CHECK_MODULES([ORTP], [ortp])
+PKG_CHECK_MODULES([BCTOOLBOX], [bctoolbox])
+AX_PTHREAD
 
 # Checks for header files.
 AC_CHECK_HEADERS([netdb.h string.h sys/socket.h])

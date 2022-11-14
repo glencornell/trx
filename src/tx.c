@@ -29,6 +29,7 @@
 #include "device.h"
 #include "notice.h"
 #include "sched.h"
+#include "ptt.h"
 
 static unsigned int verbose = DEFAULT_VERBOSE;
 
@@ -60,13 +61,17 @@ static int send_one_frame(snd_pcm_t *snd,
 		OpusEncoder *encoder,
 		const size_t bytes_per_frame,
 		const unsigned int ts_per_frame,
-		RtpSession *session)
+		RtpSession *session,
+		ptt_t *ptt)
 {
 	int16_t *pcm;
 	void *packet;
 	ssize_t z;
 	snd_pcm_sframes_t f;
 	static unsigned int ts = 0;
+
+        if(!ptt_is_pressed(ptt))
+          return 0;
 
 	pcm = alloca(sizeof(*pcm) * samples * channels);
 	packet = alloca(bytes_per_frame);
@@ -111,14 +116,15 @@ static int run_tx(snd_pcm_t *snd,
 		OpusEncoder *encoder,
 		const size_t bytes_per_frame,
 		const unsigned int ts_per_frame,
-		RtpSession *session)
+		RtpSession *session,
+		ptt_t *ptt)
 {
 	for (;;) {
 		int r;
 
 		r = send_one_frame(snd, channels, frame,
 				encoder, bytes_per_frame, ts_per_frame,
-				session);
+                                   session, ptt);
 		if (r == -1)
 			return -1;
 
@@ -171,6 +177,7 @@ int main(int argc, char *argv[])
 	snd_pcm_t *snd;
 	OpusEncoder *encoder;
 	RtpSession *session;
+        ptt_t *ptt;
 
 	/* command-line options */
 	const char *device = DEFAULT_DEVICE,
@@ -229,6 +236,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
+        ptt = ptt_create_simple();
+
 	encoder = opus_encoder_create(rate, channels, OPUS_APPLICATION_AUDIO,
 				&error);
 	if (encoder == NULL) {
@@ -264,7 +273,7 @@ int main(int argc, char *argv[])
 
 	go_realtime();
 	r = run_tx(snd, channels, frame, encoder, bytes_per_frame,
-		ts_per_frame, session);
+                   ts_per_frame, session, ptt);
 
 	if (snd_pcm_close(snd) < 0)
 		abort();
@@ -274,6 +283,8 @@ int main(int argc, char *argv[])
 	ortp_global_stats_display();
 
 	opus_encoder_destroy(encoder);
+
+        ptt_destroy(ptt);
 
 	return r;
 }
