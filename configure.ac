@@ -17,6 +17,7 @@ PKG_CHECK_MODULES([ALSA], [alsa])
 PKG_CHECK_MODULES([OPUS], [opus])
 PKG_CHECK_MODULES([ORTP], [ortp])
 PKG_CHECK_MODULES([BCTOOLBOX], [bctoolbox])
+PKG_CHECK_MODULES([GPIOD], [libgpiod])
 AX_PTHREAD
 
 # Checks for header files.
