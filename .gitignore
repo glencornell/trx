@@ -1,6 +1,8 @@
 *.d
 *.o
 *~
+.deps/
+.dirstamp
 Makefile
 Makefile.in
 aclocal.m4
@@ -15,7 +17,5 @@ depcomp
 install-sh
 missing
 rx
-src/.deps/
-src/.dirstamp
 test-jitter
 tx

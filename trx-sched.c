@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "sched.h"
+#include "trx-sched.h"
 
 #define REALTIME_PRIORITY 80
 

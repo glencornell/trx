@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.69])
 AC_INIT([trx], [0.1], [mark@xwax.org])
-AC_CONFIG_SRCDIR([src/notice.h])
+AC_CONFIG_SRCDIR([notice.h])
 
 # Initiaize automake
 AM_INIT_AUTOMAKE([foreign subdir-objects])

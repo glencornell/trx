@@ -17,10 +17,10 @@
  *
  */
 
-#ifndef MISC_H
-#define MISC_H
+#ifndef TRX_SCHED_H
+#define TRX_SCHED_H
 
 int go_realtime(void);
 int go_daemon(const char *pid_file);
 
-#endif
+#endif /* TRX_SCHED_H */

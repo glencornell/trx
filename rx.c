@@ -28,7 +28,7 @@
 #include "defaults.h"
 #include "device.h"
 #include "notice.h"
-#include "sched.h"
+#include "trx-sched.h"
 
 static unsigned int verbose = DEFAULT_VERBOSE;
 

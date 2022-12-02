@@ -29,7 +29,7 @@
 #include "defaults.h"
 #include "device.h"
 #include "notice.h"
-#include "sched.h"
+#include "trx-sched.h"
 
 // Set this to 1 to enable the push to talk capability
 #define ENABLE_PTT 0
