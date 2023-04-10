@@ -30,19 +30,10 @@
 #include "device.h"
 #include "notice.h"
 #include "trx-sched.h"
-
-// Set this to 1 to enable the push to talk capability
-#define ENABLE_PTT 0
-
-#if ENABLE_PTT
 #include "ptt.h"
-#endif /* ENABLE_PTT */
 
 unsigned int verbose = DEFAULT_VERBOSE;
-
-#if ENABLE_PTT
 bool ptt_is_enabled = DEFAULT_PTT_ENABLED;
-#endif /* ENABLE_PTT */
 
 static RtpSession* create_rtp_send(const char *addr_desc, const int port)
 {
@@ -72,11 +63,8 @@ static int send_one_frame(snd_pcm_t *snd,
 		OpusEncoder *encoder,
 		const size_t bytes_per_frame,
 		const unsigned int ts_per_frame,
-		RtpSession *session
-#if ENABLE_PTT
-                ,ptt_t *ptt
-#endif /* ENABLE_PTT */
-                          )
+		RtpSession *session,
+                ptt_t *ptt)
 {
 	int16_t *pcm;
 	void *packet;
@@ -109,36 +97,17 @@ static int send_one_frame(snd_pcm_t *snd,
 		return 0;
 	}
 
-#if ENABLE_PTT
-// TODO: Determine the proper behavior for muted packets: send
-// memset(0) frames or drop muted frames?  I'm not sure if RTP
-// likes missing frames.
-#define PTT_DROP_MUTED_PACKETS 1
-#define PTT_ZERO_MUTED_PACKETS (!PTT_DROP_MUTED_PACKETS)
-        
-#if PTT_ZERO_MUTED_PACKETS
-        // If PTT capability is enabled, zero out the samples when the
-        // PTT button is pressed.
+        // If PTT capability is enabled, only send packets when the
+        // PTT button is pressed.  Otherwise, unconditionally send the
+        // packet.
         if(ptt_is_enabled && !ptt_is_pressed(ptt))
-          memset(pcm, 0, sizeof(*pcm) * samples * channels);
-#endif /* PTT_ZERO_MUTED_PACKETS */
-#endif /* ENABLE_PTT */
+          return 0;
 
 	z = opus_encode(encoder, pcm, samples, packet, bytes_per_frame);
 	if (z < 0) {
 		fprintf(stderr, "opus_encode_float: %s\n", opus_strerror(z));
 		return -1;
 	}
-
-#if ENABLE_PTT
-#if PTT_DROP_MUTED_PACKETS
-        // If PTT capability is enabled, only send packets when the
-        // PTT button is pressed.  Otherwise, unconditionally send the
-        // packet.
-        if(ptt_is_enabled && !ptt_is_pressed(ptt))
-          return 0;
-#endif /* PTT_DROP_MUTED_PACKETS */
-#endif /* ENABLE_PTT */
 
         rtp_session_send_with_ts(session, packet, z, ts);
 	ts += ts_per_frame;
@@ -152,22 +121,16 @@ static int run_tx(snd_pcm_t *snd,
 		OpusEncoder *encoder,
 		const size_t bytes_per_frame,
 		const unsigned int ts_per_frame,
-		RtpSession *session
-#if ENABLE_PTT
-                ,ptt_t *ptt
-#endif /* ENABLE_PTT */
-                  )
+		RtpSession *session,
+                ptt_t *ptt)
 {
 	for (;;) {
 		int r;
 
 		r = send_one_frame(snd, channels, frame,
                                    encoder, bytes_per_frame, ts_per_frame,
-                                   session
-#if ENABLE_PTT
-                                   ,ptt
-#endif /* ENABLE_PTT */
-                                   );
+                                   session,
+                                   ptt);
 		if (r == -1)
 			return -1;
 
@@ -208,13 +171,11 @@ static void usage(FILE *fd)
 		DEFAULT_VERBOSE);
 	fprintf(fd, "  -D <file>   Run as a daemon, writing process ID to the given file\n");
 
-#if ENABLE_PTT
 	fprintf(fd, "\nPush to talk parameters:\n");
         fprintf(fd, "  -t          Enable push-to-talk mode (default: %s)\n",
                 DEFAULT_PTT_ENABLED ? "enabled" : "disabled");
 	fprintf(fd, "  -k <n>      Keycode in hex to use as the PTT key (default %04x)\n",
                 DEFAULT_PTT_DEV_INPUT_KEYCODE);
-#endif /* ENABLE_PTT */
 
 	fprintf(fd, "\nAllowed frame sizes (-f) are defined by the Opus codec. For example,\n"
 		"at 48000Hz the permitted values are 120, 240, 480 or 960.\n");
@@ -228,9 +189,7 @@ int main(int argc, char *argv[])
 	snd_pcm_t *snd;
 	OpusEncoder *encoder;
 	RtpSession *session;
-#if ENABLE_PTT
         ptt_t *ptt = NULL;
-#endif /* ENABLE_PTT */
 
 	/* command-line options */
 	const char *device = DEFAULT_DEVICE,
@@ -246,11 +205,7 @@ int main(int argc, char *argv[])
 	for (;;) {
 		int c;
 
-		c = getopt(argc, argv, "b:c:d:f:h:m:p:r:"
-#if ENABLE_PTT
-                           "t"
-#endif /* ENABLE_PTT */
-                           "v:D:");
+		c = getopt(argc, argv, "b:c:d:f:h:m:p:r:tv:D:");
 		if (c == -1)
 			break;
 
@@ -279,11 +234,9 @@ int main(int argc, char *argv[])
 		case 'r':
 			rate = atoi(optarg);
 			break;
-#if ENABLE_PTT
                 case 't':
 			ptt_is_enabled = true;
 			break;
-#endif /* ENABLE_PTT */
 		case 'v':
 			verbose = atoi(optarg);
 			break;
@@ -299,10 +252,8 @@ int main(int argc, char *argv[])
         if (verbose)
           fputs(COPYRIGHT "\n", stderr);
 
-#if ENABLE_PTT
         if (ptt_is_enabled)
           ptt = ptt_create_simple();
-#endif /* ENABLE_PTT */
 
 	encoder = opus_encoder_create(rate, channels, OPUS_APPLICATION_AUDIO,
 				&error);
@@ -339,11 +290,7 @@ int main(int argc, char *argv[])
 
 	go_realtime();
 	r = run_tx(snd, channels, frame, encoder, bytes_per_frame,
-                   ts_per_frame, session
-#if ENABLE_PTT
-                   , ptt
-#endif /* ENABLE_PTT */
-                   );
+                   ts_per_frame, session, ptt);
 
 	if (snd_pcm_close(snd) < 0)
 		abort();
@@ -354,9 +301,7 @@ int main(int argc, char *argv[])
 
 	opus_encoder_destroy(encoder);
 
-#if ENABLE_PTT
         ptt_destroy(ptt);
-#endif /* ENABLE_PTT */
 
 	return r;
 }

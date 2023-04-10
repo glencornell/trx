@@ -9,7 +9,7 @@ typedef enum {
   PTT_INPUT_SOURCE_GPIO
 } ptt_input_source_t;
 
-#define DEFAULT_PTT_ENABLED false
+#define DEFAULT_PTT_ENABLED true
 
 #define DEFAULT_PTT_INPUT_SOURCE PTT_INPUT_SOURCE_DEV_INPUT
 #define DEFAULT_PTT_DEV_INPUT_KEYCODE KEY_LEFTCTRL
@@ -45,6 +45,6 @@ bool ptt_is_pressed(ptt_t *ptt);
 
 // OPTION 2: invoke this from your thread context's main loop to
 // invoke the button state change callbacks
-void ptt_loop(ptt_t *ptt);
+void ptt_loop_iter(ptt_t *ptt);
 
 #endif /* PTT_H_INCLUDED */

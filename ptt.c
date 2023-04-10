@@ -206,15 +206,15 @@ void ptt_add_released_cb(ptt_t *ptt, ptt_released_cb_t cb, void *user_data) {
   ptt->released_user_data = user_data;
 }
 
-void ptt_loop(ptt_t *ptt) {
+void ptt_loop_iter(ptt_t *ptt) {
   const bool is_pressed = ptt_is_pressed(ptt);
   const bool was_pressed = ptt->prev_key_state == PTT_KEY_STATE_PRESSED;
 
-  if (is_pressed && !was_pressed && ptt->pressed_cb) {
+  if (is_pressed && !was_pressed) {
     ptt->prev_key_state = PTT_KEY_STATE_PRESSED;
-    ptt->pressed_cb(ptt, ptt->pressed_user_data);
-  } else if (!is_pressed && was_pressed && ptt->released_cb) {
+    if (ptt->pressed_cb) ptt->pressed_cb(ptt, ptt->pressed_user_data);
+  } else if (!is_pressed && was_pressed) {
     ptt->prev_key_state = PTT_KEY_STATE_RELEASED;
-    ptt->released_cb(ptt, ptt->released_user_data);
+    if (ptt->released_cb) ptt->released_cb(ptt, ptt->released_user_data);
   }
 }

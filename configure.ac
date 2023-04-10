@@ -19,6 +19,7 @@ PKG_CHECK_MODULES([ORTP], [ortp])
 PKG_CHECK_MODULES([BCTOOLBOX], [bctoolbox])
 PKG_CHECK_MODULES([GPIOD], [libgpiod])
 AX_PTHREAD
+AX_CHECK_OPENSSL
 
 # Checks for header files.
 AC_CHECK_HEADERS([netdb.h string.h sys/socket.h])
